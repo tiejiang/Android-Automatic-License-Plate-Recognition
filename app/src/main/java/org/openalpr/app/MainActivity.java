@@ -55,7 +55,7 @@ public class MainActivity extends Activity implements AsyncListener<AlprResult> 
 
         @Override
         public void onClick(View view) {
-            dispatchTakePictureIntent();
+            dispatchTakePictureIntent();   //begin to take picture
         }
     };
 
@@ -63,34 +63,25 @@ public class MainActivity extends Activity implements AsyncListener<AlprResult> 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-
         if (!PreferenceManager.getDefaultSharedPreferences(
                 getApplicationContext())
                 .getBoolean(PREF_INSTALLED_KEY, false)) {
-
             PreferenceManager.getDefaultSharedPreferences(
                     getApplicationContext())
                     .edit().putBoolean(PREF_INSTALLED_KEY, true).commit();
-
             /*PreferenceManager.getDefaultSharedPreferences(getApplicationContext()).
                     edit().putString(RUNTIME_DATA_DIR_ASSET, ANDROID_DATA_DIR).commit();*/
-
             copyAssetFolder(getAssets(), RUNTIME_DATA_DIR_ASSET,
                     ANDROID_DATA_DIR + File.separatorChar + RUNTIME_DATA_DIR_ASSET);
         }
-
         setContentView(R.layout.activity_main);
 
         mImageView = (ImageView)findViewById(R.id.imageView);
-
         plate = (EditText)findViewById(R.id.plateNumberId);
         processingTime = (EditText)findViewById(R.id.processingTimeId);
-
-
         errorText = (TextView)findViewById(R.id.errorTextView);
-
         Button takePicBtn = (Button)findViewById(R.id.button);
-
+        //take photo click event
         setBtnListenerOrDisable(takePicBtn, takePhotoBtnClickListener,
                 MediaStore.ACTION_IMAGE_CAPTURE);
     }
