@@ -5,12 +5,11 @@ package org.openalpr.app.bluetooth;
  */
 
 import android.app.Activity;
-import android.content.Context;
+import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
-import android.os.Vibrator;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -18,6 +17,7 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.openalpr.app.MainActivity;
 import org.openalpr.app.R;
 
 import java.io.IOException;
@@ -41,8 +41,11 @@ public class RelayControl extends Activity{
     private ConnectedThread manageThread;
     private Handler mHandler;
     private String  encodeType ="GBK";
-    private Vibrator mVibrator;
+//    private Vibrator mVibrator;
     long [] pattern = {100,400,100,400};   // 停止 开启 停止 开启
+    private String readStr1 = "";
+    private byte[] commandByte = {'S', 'K', 'E'}; //向下位机发送的指令
+    public boolean is_detect = false; //是否在识别车牌的标志位， fasle 没有， true 正在识别（不能再启动一次识别程序块，必须等待上次识别过程完成）
 
     @Override
     public void onCreate(Bundle savedInstanceState){
@@ -58,9 +61,16 @@ public class RelayControl extends Activity{
         //接收区不可见
         _txtRead.setCursorVisible(false);      //设置输入框中的光标不可见
         _txtRead.setFocusable(false);           //无焦点
-        mVibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+//        mVibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
 
 
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        is_detect = false;  //重新回到relaycontrol时，又变成待识别车牌
+        Log.d("TIEJIANG", "onResume");
     }
 
     private void findMyView() {
@@ -90,7 +100,7 @@ public class RelayControl extends Activity{
             e.printStackTrace();
         }
         super.onDestroy();
-        mVibrator.cancel();
+//        mVibrator.cancel();
     }
 
 
@@ -112,13 +122,13 @@ public class RelayControl extends Activity{
                 }
             }else if (v == car_left) {
                 car_left.setBackgroundColor(Color.WHITE);
-                mVibrator.cancel();
+//                mVibrator.cancel();
             }else if (v == car_right) {
                 car_right.setBackgroundColor(Color.WHITE);
-                mVibrator.cancel();
+//                mVibrator.cancel();
             }else if (v == car_back) {
                 car_back.setBackgroundColor(Color.WHITE);
-                mVibrator.cancel();
+//                mVibrator.cancel();
             }
             else if (v == btBack) {// 返回
                 RelayControl.this.finish();
@@ -133,6 +143,28 @@ public class RelayControl extends Activity{
             view.setFocusableInTouchMode(able);     //触摸时也得不到焦点
         }
     }
+
+    public void sendCommand(byte[] command) {
+        //控制模块
+        try {
+            outStream = testBlueTooth.btSocket.getOutputStream();
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            //Log.e(TAG, "ON RESUME: Output stream creation failed.", e);
+            Toast.makeText(getApplicationContext(), " Output stream creation failed.", Toast.LENGTH_SHORT).show();
+        }
+        byte[] msgBuffer = command;
+        try {
+            outStream.write(msgBuffer);
+            Log.d("TIEJIANG", "send command to MCU");
+            //Toast.makeText(getApplicationContext(), "发送数据中..", Toast.LENGTH_SHORT);
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            //Log.e(TAG, "ON RESUME: Exception during write.", e);
+            Toast.makeText(getApplicationContext(), "发送数据失败", Toast.LENGTH_SHORT).show();
+        }
+    }
+
     public void sendMessage(String message) {
         //控制模块
         try {
@@ -205,8 +237,18 @@ public class RelayControl extends Activity{
                                 byte[] btBuf = new byte[len];
                                 System.arraycopy(temp, 0, btBuf, 0, btBuf.length);
                                 //读编码
-                                String readStr1 = new String(btBuf,encodeType);
-                                mHandler.obtainMessage(01,len,-1,readStr1).sendToTarget();
+                                String sendToUI = readStr1;
+                                readStr1 = new String(btBuf,encodeType);
+                                sendToUI = sendToUI + readStr1;
+                                Log.d("TIEJIANG", "sendToUI: " + sendToUI);
+
+                                if (readStr1.contains("S") || readStr1.contains("E")){
+                                    mHandler.obtainMessage(01,len,-1,sendToUI).sendToTarget();
+                                    sendToUI = "";
+                                }
+                                if(readStr1.trim().length() > 5) {
+                                    sendToUI = "";
+                                }
                             }
                             Thread.sleep(wait);// 延时一定时间缓冲数据
                         }catch (Exception e) {
@@ -232,8 +274,15 @@ public class RelayControl extends Activity{
                 case 01:
                     //_txtRead.setText("");
                     String info=(String) msg.obj;
+                    Log.d("TIEJIANG", "info = " + info);
                     _txtRead.append(info);
-                    AnalyzeData(info);
+                    if(info.contains("D") && !is_detect){
+                        Intent mTakePictureIntent = new Intent(RelayControl.this, MainActivity.class);
+                        startActivity(mTakePictureIntent);
+                        is_detect = true;
+//                        finish();
+                    }
+//                    AnalyzeData(info);
                     break;
 
                 default:
